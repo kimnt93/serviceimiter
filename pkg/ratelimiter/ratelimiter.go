@@ -1,6 +1,14 @@
 package ratelimiter
 
-func IsAllow(rlConfig RateLimitConfig) (bool, RateLimitRemaining) {
+type RateLimiter struct {
+	bucket Bucket
+}
+
+func NewRateLimiter(bucket Bucket) *RateLimiter {
+	return &RateLimiter{bucket: bucket}
+}
+
+func (rl *RateLimiter) IsAllow(rlConfig RateLimitConfig) (bool, RateLimitRemaining) {
 	allowed := true
 
 	secondKey := GetKey(rlConfig.AccountID, rlConfig.ServiceName, SECOND_PERIOD)
@@ -23,8 +31,8 @@ func IsAllow(rlConfig RateLimitConfig) (bool, RateLimitRemaining) {
 
 	for _, bucketConfig := range bucketConfigs {
 		// Refill bucket
-		refillToken(bucketConfig)
-		if bucketConfig.Capacity != UNLIMITED_RATE && !isAllow(bucketConfig) {
+		rl.bucket.refillToken(bucketConfig)
+		if bucketConfig.Capacity != UNLIMITED_RATE && !rl.bucket.isAllow(bucketConfig) {
 			allowed = false
 		}
 	}
@@ -32,19 +40,19 @@ func IsAllow(rlConfig RateLimitConfig) (bool, RateLimitRemaining) {
 	remaining := RateLimitRemaining{
 		AccountID:        rlConfig.AccountID,
 		ServiceName:      rlConfig.ServiceName,
-		RequestPerSecond: getRemainingTokens(bucketConfigs[0]),
-		RequestPerMinute: getRemainingTokens(bucketConfigs[1]),
-		RequestPerHour:   getRemainingTokens(bucketConfigs[2]),
-		RequestPerDay:    getRemainingTokens(bucketConfigs[3]),
-		RequestPerWeek:   getRemainingTokens(bucketConfigs[4]),
-		RequestPerMonth:  getRemainingTokens(bucketConfigs[5]),
-		RequestPerYear:   getRemainingTokens(bucketConfigs[6]),
+		RequestPerSecond: rl.bucket.getRemainingTokens(bucketConfigs[0]),
+		RequestPerMinute: rl.bucket.getRemainingTokens(bucketConfigs[1]),
+		RequestPerHour:   rl.bucket.getRemainingTokens(bucketConfigs[2]),
+		RequestPerDay:    rl.bucket.getRemainingTokens(bucketConfigs[3]),
+		RequestPerWeek:   rl.bucket.getRemainingTokens(bucketConfigs[4]),
+		RequestPerMonth:  rl.bucket.getRemainingTokens(bucketConfigs[5]),
+		RequestPerYear:   rl.bucket.getRemainingTokens(bucketConfigs[6]),
 	}
 
 	return allowed, remaining
 }
 
-func UpdateToken(rlConfig RateLimitConfig) {
+func (rl *RateLimiter) UpdateToken(rlConfig RateLimitConfig) {
 	go func() {
 		secondKey := GetKey(rlConfig.AccountID, rlConfig.ServiceName, SECOND_PERIOD)
 		minuteKey := GetKey(rlConfig.AccountID, rlConfig.ServiceName, MINUTE_PERIOD)
@@ -66,7 +74,7 @@ func UpdateToken(rlConfig RateLimitConfig) {
 
 		for _, bucketConfig := range bucketConfigs {
 			if bucketConfig.Capacity > 0 {
-				consumeToken(bucketConfig)
+				rl.bucket.consumeToken(bucketConfig)
 			}
 		}
 	}()

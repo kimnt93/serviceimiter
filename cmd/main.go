@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"ratelimiter/pkg/ratelimiter"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -11,23 +12,24 @@ func main() {
 		AccountID:        "user123",
 		ServiceName:      "A",
 		RequestPerSecond: 2,
-		RequestPerMinute: 10,
-		RequestPerHour:   600,
+		RequestPerMinute: 50,
+		RequestPerHour:   400,
 		RequestPerDay:    ratelimiter.UNLIMITED_RATE,
 		RequestPerWeek:   ratelimiter.UNLIMITED_RATE,
 		RequestPerMonth:  ratelimiter.UNLIMITED_RATE,
 		RequestPerYear:   ratelimiter.UNLIMITED_RATE,
 	}
 
-	ratelimiter.NewDefaultTokenBucket()
+	bucket := ratelimiter.NewDefaultBucket()
+	rateLimiter := ratelimiter.NewRateLimiter(bucket)
 
 	for i := 0; i < 1000; i++ {
-		allowed, remaining := ratelimiter.IsAllow(config)
+		allowed, remaining := rateLimiter.IsAllow(config)
 		if allowed {
-			fmt.Printf("Request allowed. Remaining limits: %+v\n", remaining)
-			ratelimiter.UpdateToken(config)
+			log.Info().Msgf("Request allowed. Remaining limits: %+v\n", remaining)
+			rateLimiter.UpdateToken(config)
 		} else {
-			fmt.Printf("Request denied. Remaining limits: %+v\n", remaining)
+			log.Info().Msgf("Request denied. Remaining limits: %+v\n", remaining)
 		}
 		time.Sleep(1 * time.Second)
 	}
