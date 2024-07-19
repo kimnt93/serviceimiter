@@ -1,4 +1,4 @@
-package ratelimiter
+package servicelimiter
 
 const (
 	UNLIMITED_RATE = -1
@@ -23,3 +23,7 @@ const (
 	REDIS_BUCKET  = 0
 	MEMORY_BUCKET = 1
 )
+
+const AUTO_SERVICE_NAME = "_"
+
+const RATE_LIMIT_PREFIX = "rate_limiter_rl"

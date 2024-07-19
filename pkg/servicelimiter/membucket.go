@@ -1,6 +1,7 @@
-package ratelimiter
+package servicelimiter
 
 import (
+	"github.com/rs/zerolog/log"
 	"sync"
 	"time"
 )
@@ -12,10 +13,15 @@ type DefaultBucket struct {
 }
 
 func NewDefaultBucket() *DefaultBucket {
-	return &DefaultBucket{
-		tokenBuckets:    make(map[string]int),
-		lastRefillTimes: make(map[string]time.Time),
+	if !isBucketInitialized {
+		isBucketInitialized = true
+		return &DefaultBucket{
+			tokenBuckets:    make(map[string]int),
+			lastRefillTimes: make(map[string]time.Time),
+		}
 	}
+	log.Warn().Msgf("Another bucket has been initialized")
+	return nil
 }
 
 func (bk *DefaultBucket) refillToken(bucketConfig BucketConfig) {

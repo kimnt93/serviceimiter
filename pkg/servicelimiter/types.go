@@ -1,4 +1,4 @@
-package ratelimiter
+package servicelimiter
 
 type RateLimitConfig struct {
 	AccountID        string
@@ -22,11 +22,4 @@ type RateLimitRemaining struct {
 	RequestPerWeek   int
 	RequestPerMonth  int
 	RequestPerYear   int
-}
-
-type BucketConfig struct {
-	Key        string
-	PeriodType int
-	Capacity   int
-	Ttl        int
 }

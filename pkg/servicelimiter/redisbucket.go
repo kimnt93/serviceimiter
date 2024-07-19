@@ -1,35 +1,35 @@
-package ratelimiter
+package servicelimiter
 
 import (
 	"context"
+	"errors"
+	"github.com/rs/zerolog/log"
 	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-type RedisConfig struct {
-	Addr     string
-	Password string
-	DB       int
-}
-
 type RedisBucket struct {
 	client *redis.Client
 }
 
 var (
-	Ctx = context.Background()
+	ctx = context.Background()
 )
 
-func NewRedisBucket(config RedisConfig) *RedisBucket {
-	client := redis.NewClient(&redis.Options{
-		Addr:     config.Addr,
-		Password: config.Password,
-		DB:       config.DB,
-	})
-
-	return &RedisBucket{client: client}
+func NewRedisBucket(addr string, password string, db int) *RedisBucket {
+	if !isBucketInitialized {
+		isBucketInitialized = true
+		client := redis.NewClient(&redis.Options{
+			Addr:     addr,
+			Password: password,
+			DB:       db,
+		})
+		return &RedisBucket{client: client}
+	}
+	log.Warn().Msgf("Another bucket has been initialized")
+	return nil
 }
 
 func (rb *RedisBucket) refillToken(bucketConfig BucketConfig) {
@@ -43,17 +43,17 @@ func (rb *RedisBucket) refillToken(bucketConfig BucketConfig) {
 	tokensKey := key + ":tokens"
 
 	pipe := rb.client.TxPipeline()
-	lastRefillCmd := pipe.Get(Ctx, lastRefillKey)
-	tokensCmd := pipe.Get(Ctx, tokensKey)
-	_, err := pipe.Exec(Ctx)
-	if err != nil && err != redis.Nil {
+	lastRefillCmd := pipe.Get(ctx, lastRefillKey)
+	tokensCmd := pipe.Get(ctx, tokensKey)
+	_, err := pipe.Exec(ctx)
+	if err != nil && !errors.Is(redis.Nil, err) {
 		return
 	}
 
 	var lastRefill int
-	if lastRefillCmd.Err() == redis.Nil {
+	if errors.Is(redis.Nil, lastRefillCmd.Err()) {
 		lastRefill = int(now)
-		pipe.Set(Ctx, lastRefillKey, now, 0)
+		pipe.Set(ctx, lastRefillKey, now, 0)
 	} else {
 		lastRefill, err = strconv.Atoi(lastRefillCmd.Val())
 		if err != nil {
@@ -62,9 +62,9 @@ func (rb *RedisBucket) refillToken(bucketConfig BucketConfig) {
 	}
 
 	var tokens int
-	if tokensCmd.Err() == redis.Nil {
+	if errors.Is(tokensCmd.Err(), redis.Nil) {
 		tokens = bucketConfig.Capacity
-		pipe.Set(Ctx, tokensKey, bucketConfig.Capacity, 0)
+		pipe.Set(ctx, tokensKey, bucketConfig.Capacity, 0)
 	} else {
 		// convert to int
 		tokens, err = strconv.Atoi(tokensCmd.Val())
@@ -78,14 +78,14 @@ func (rb *RedisBucket) refillToken(bucketConfig BucketConfig) {
 	tokensToAdd := int(elapsed * refillRate * float64(bucketConfig.Capacity))
 	updatedTokens := min(bucketConfig.Capacity, tokens+tokensToAdd)
 
-	pipe.Set(Ctx, tokensKey, updatedTokens, 0)
-	pipe.Set(Ctx, lastRefillKey, now, 0)
-	pipe.Exec(Ctx)
+	pipe.Set(ctx, tokensKey, updatedTokens, 0)
+	pipe.Set(ctx, lastRefillKey, now, 0)
+	pipe.Exec(ctx)
 }
 
 func (rb *RedisBucket) isAllow(bucketConfig BucketConfig) bool {
-	tokens, err := rb.client.Get(Ctx, bucketConfig.Key+":tokens").Int()
-	if err != nil && err != redis.Nil {
+	tokens, err := rb.client.Get(ctx, bucketConfig.Key+":tokens").Int()
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return false
 	}
 	return tokens > 0
@@ -97,25 +97,25 @@ func (rb *RedisBucket) consumeToken(bucketConfig BucketConfig) bool {
 	lastRefillKey := key + ":last_refill"
 
 	pipe := rb.client.TxPipeline()
-	tokensCmd := pipe.Get(Ctx, tokensKey)
-	_, err := pipe.Exec(Ctx)
-	if err != nil && err != redis.Nil {
+	tokensCmd := pipe.Get(ctx, tokensKey)
+	_, err := pipe.Exec(ctx)
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return false
 	}
 
 	tokens, err := strconv.Atoi(tokensCmd.Val())
 	if tokens >= 1 {
-		pipe.Decr(Ctx, tokensKey)
-		pipe.Set(Ctx, lastRefillKey, time.Now().Unix(), 0)
-		pipe.Exec(Ctx)
+		pipe.Decr(ctx, tokensKey)
+		pipe.Set(ctx, lastRefillKey, time.Now().Unix(), 0)
+		pipe.Exec(ctx)
 		return true
 	}
 	return false
 }
 
 func (rb *RedisBucket) getRemainingTokens(bucketConfig BucketConfig) int {
-	tokens, err := rb.client.Get(Ctx, bucketConfig.Key+":tokens").Int()
-	if err != nil && err != redis.Nil {
+	tokens, err := rb.client.Get(ctx, bucketConfig.Key+":tokens").Int()
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return 0
 	}
 	return tokens
