@@ -1,7 +1,7 @@
 package main
 
 import (
-	"ratelimiter/pkg/servicelimiter"
+	"servicelimiter/pkg/servicelimiter"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -24,7 +24,7 @@ func main() {
 		RequestPerYear:   servicelimiter.UNLIMITED_RATE,
 	}
 
-	bucket := servicelimiter.NewDefaultBucket()
+	bucket := servicelimiter.NewDefaultBucket() // or can use servicelimiter.NewRedisBucket("localhost:6379", "", 0)
 	rl := servicelimiter.NewRateLimiter(bucket)
 
 	for i := 0; i < 1000; i++ {

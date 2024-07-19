@@ -1,4 +1,4 @@
-module ratelimiter
+module servicelimiter
 
 go 1.22.5
 

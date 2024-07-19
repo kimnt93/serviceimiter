@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"ratelimiter/pkg/servicelimiter"
+	"servicelimiter/pkg/servicelimiter"
 	"time"
 
 	"github.com/rs/zerolog/log"

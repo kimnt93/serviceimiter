@@ -9,8 +9,9 @@ import (
 type DefaultBucket struct {
 	tokenBuckets    map[string]int
 	lastRefillTimes map[string]time.Time
-	mutex           sync.Mutex
 }
+
+var mutex sync.Mutex
 
 func NewDefaultBucket() *DefaultBucket {
 	if !isBucketInitialized {
@@ -25,8 +26,8 @@ func NewDefaultBucket() *DefaultBucket {
 }
 
 func (bk *DefaultBucket) refillToken(bucketConfig BucketConfig) {
-	bk.mutex.Lock()
-	defer bk.mutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	if bucketConfig.Capacity == UNLIMITED_RATE {
 		return
@@ -52,15 +53,15 @@ func (bk *DefaultBucket) refillToken(bucketConfig BucketConfig) {
 }
 
 func (bk *DefaultBucket) isAllow(bucketConfig BucketConfig) bool {
-	bk.mutex.Lock()
-	defer bk.mutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	return bk.tokenBuckets[bucketConfig.Key] > 0
 }
 
 func (bk *DefaultBucket) consumeToken(bucketConfig BucketConfig) bool {
-	bk.mutex.Lock()
-	defer bk.mutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	if bk.tokenBuckets[bucketConfig.Key] >= 1 {
 		bk.tokenBuckets[bucketConfig.Key] = bk.tokenBuckets[bucketConfig.Key] - 1
@@ -71,8 +72,8 @@ func (bk *DefaultBucket) consumeToken(bucketConfig BucketConfig) bool {
 }
 
 func (bk *DefaultBucket) getRemainingTokens(bucketConfig BucketConfig) int {
-	bk.mutex.Lock()
-	defer bk.mutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	return bk.tokenBuckets[bucketConfig.Key]
 }
